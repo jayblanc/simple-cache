@@ -1,0 +1,6 @@
+# Project exclude paths
+/cache-api/target/
+/cache-core/target/
+/cache-features/target/
+/cache-itests/target/
+/cache-samples/cache-basic-sample/target/

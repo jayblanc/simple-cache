@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<features xmlns="http://karaf.apache.org/xmlns/features/v1.6.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://karaf.apache.org/xmlns/features/v1.6.0 https://karaf.apache.org/xmlns/features/v1.6.0" name="cache-features">
+    <repository>mvn:org.apache.karaf.features/specs/${karaf.version}/xml/features</repository>
+
+    <feature name="cache" version="${project.version}">
+        <details>Cache Feature for Karaf</details>
+        <feature prerequisite="true">scr</feature>
+        <feature prerequisite="true">jackson</feature>
+        <bundle>mvn:org.jahia.features.cache/cache-api/${project.version}</bundle>
+        <bundle>mvn:org.jahia.features.cache/cache-core/${project.version}</bundle>
+    </feature>
+
+    <feature name="cache-clustered" version="${project.version}">
+        <details>Clustered Cache Support Feature</details>
+        <feature dependency="true">infinispan</feature>
+        <feature>cache</feature>
+    </feature>
+
+    <feature name="cache-basic-sample" version="${project.version}">
+        <details>Basic Sample Cache Usage</details>
+        <feature>cache</feature>
+        <bundle>mvn:org.jahia.features.cache/cache-basic-sample/${project.version}</bundle>
+    </feature>
+</features>
