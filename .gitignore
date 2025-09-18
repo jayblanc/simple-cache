@@ -1,6 +1,16 @@
 # Project exclude paths
-/cache-api/target/
-/cache-core/target/
-/cache-features/target/
-/cache-itests/target/
-/cache-samples/cache-basic-sample/target/
+ /.idea/
+
+ # Ignore all target folders at any level
+ **/target/
+
+ # Common values
+ *.log
+ *.tmp
+ *.swp
+ .DS_Store
+ Thumbs.db
+ .env
+ .vscode/
+ *.bak
+ *.old
