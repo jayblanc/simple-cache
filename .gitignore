@@ -1,16 +1,16 @@
 # Project exclude paths
- /.idea/
+.idea/**/*
 
- # Ignore all target folders at any level
- **/target/
+# Ignore all target folders at any level
+**/target
 
- # Common values
- *.log
- *.tmp
- *.swp
- .DS_Store
- Thumbs.db
- .env
- .vscode/
- *.bak
- *.old
+# Common values
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+.env
+.vscode/
+*.bak
+*.old
