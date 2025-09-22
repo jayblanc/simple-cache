@@ -137,11 +137,11 @@ When you need fine-grained control, use the programmatic API:
 public class AdvancedCacheService {
     
     @Reference
-    private CacheService cacheService;
+    private CacheService cacheManager;
     
     public void demonstrateProgrammaticUsage() {
         // Create a custom cache with specific configuration
-        Cache<String> myCache = cacheService.create(
+        Cache<String> myCache = cacheManager.create(
             "customCache",
             CacheConfig.create()
                 .maxEntries(5000)
@@ -170,7 +170,7 @@ public class AdvancedCacheService {
     public User getUser(String id) {
         try {
             // Get an existing cache
-            Cache<User> userCache = cacheService.get("userCache", User.class);
+            Cache<User> userCache = cacheManager.get("userCache", User.class);
             
             // Perform operations
             User user = userCache.get(id);
@@ -197,7 +197,7 @@ CacheConfig config = CacheConfig.create()
     .timeToLive(3600)       // TTL in seconds (1 hour)
     .build();
 
-Cache<String> cache = cacheService.create("myCache", config, String.class);
+Cache<String> cache = cacheManager.create("myCache", config, String.class);
 ```
 
 ### Clustered vs In-Memory Caching

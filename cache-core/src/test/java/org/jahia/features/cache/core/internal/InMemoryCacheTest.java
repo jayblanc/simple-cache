@@ -16,7 +16,6 @@
 package org.jahia.features.cache.core.internal;
 
 import org.jahia.features.cache.api.CacheConfig;
-import org.jahia.features.cache.api.CacheEntry;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

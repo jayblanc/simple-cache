@@ -10,10 +10,16 @@
         <bundle>mvn:org.jahia.features.cache/cache-core/${project.version}</bundle>
     </feature>
 
-    <feature name="cache-clustered" version="${project.version}">
-        <details>Clustered Cache Support Feature</details>
-        <feature dependency="true">infinispan</feature>
+    <feature name="cache-infinispan" version="${project.version}">
+        <details>Infinispan Clustered Cache Support Feature</details>
         <feature>cache</feature>
+        <bundle>mvn:org.jahia.features.cache/cache-infinispan/${project.version}</bundle>
+    </feature>
+
+    <feature name="cache-hazelcast" version="${project.version}">
+        <details>Hazelcast Clustered Cache Support Feature</details>
+        <feature>cache</feature>
+        <bundle>mvn:org.jahia.features.cache/cache-hazelcast/${project.version}</bundle>
     </feature>
 
     <feature name="cache-basic-sample" version="${project.version}">

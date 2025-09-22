@@ -18,10 +18,17 @@ package org.jahia.features.cache.api;
 /**
  * @author Jerome Blanchard
  */
-public enum CacheStrategy {
+public interface CacheProvider {
 
-    LIFO,
-    FIFO,
-    LRU
+    String DEFAULT_PROVIDER_NAME = "default";
 
+    <T> Cache<T> createCache(String name, CacheConfig config, Class<T> type);
+
+    boolean isAvailable();
+
+    String getProviderName();
+
+    default int getPriority() {
+        return 0;
+    }
 }

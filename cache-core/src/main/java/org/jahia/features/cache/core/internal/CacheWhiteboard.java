@@ -16,7 +16,7 @@
 package org.jahia.features.cache.core.internal;
 
 import org.jahia.features.cache.api.CacheResult;
-import org.jahia.features.cache.api.CacheService;
+import org.jahia.features.cache.api.CacheManager;
 import org.osgi.framework.*;
 import org.osgi.service.component.annotations.*;
 import org.osgi.util.tracker.ServiceTracker;
@@ -44,7 +44,7 @@ public class CacheWhiteboard {
     private ServiceTracker<Object, Object> serviceTracker;
     private BundleContext context;
     @Reference
-    private CacheService cacheService;
+    private CacheManager cacheManager;
 
     @Activate
     public void activate(BundleContext context) {
@@ -72,7 +72,6 @@ public class CacheWhiteboard {
                 serviceTracker = new ServiceTracker<>(context, filter, new ServiceTrackerCustomizer<Object, Object>() {
                     @Override public Object addingService(org.osgi.framework.ServiceReference<Object> reference) {
                         Object service = context.getService(reference);
-                        // Empêche la boucle de proxy : ne pas proxyfier un proxy
                         if (Proxy.isProxyClass(service.getClass())) {
                             LOGGER.debug("Service {} is already a proxy, skipping.", service.getClass().getName());
                             return service;
@@ -136,6 +135,6 @@ public class CacheWhiteboard {
         return Proxy.newProxyInstance(
                 target.getClass().getClassLoader(),
                 target.getClass().getInterfaces(),
-                new CacheInterceptor(target, cacheService));
+                new CacheInterceptor(target, cacheManager));
     }
 }

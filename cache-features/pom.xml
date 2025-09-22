@@ -55,6 +55,9 @@
                             </framework>
                             <features>
                                 <feature>cache</feature>
+                                <feature>cache-infinispan</feature>
+                                <feature>cache-hazelcast</feature>
+                                <feature>cache-basic-sample</feature>
                             </features>
                             <ignoreMissingConditions>true</ignoreMissingConditions>
                         </configuration>

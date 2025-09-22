@@ -18,7 +18,7 @@ package org.jahia.features.cache.core.internal;
 import org.jahia.features.cache.api.Cache;
 import org.jahia.features.cache.api.CacheConfig;
 import org.jahia.features.cache.api.CacheResult;
-import org.jahia.features.cache.api.CacheService;
+import org.jahia.features.cache.api.CacheManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,11 +33,11 @@ public class CacheInterceptor implements InvocationHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(CacheInterceptor.class);
 
     private final Object target;
-    private final CacheService cacheService;
+    private final CacheManager cacheManager;
 
-    public CacheInterceptor(Object target, CacheService cacheService) {
+    public CacheInterceptor(Object target, CacheManager cacheManager) {
         this.target = target;
-        this.cacheService = cacheService;
+        this.cacheManager = cacheManager;
     }
 
     @Override
@@ -50,10 +50,10 @@ public class CacheInterceptor implements InvocationHandler {
             LOGGER.info("Methods requires cached result from cache with name: {}", cacheName);
             Cache<Object> cache;
             try {
-                cache = cacheService.get(cacheName, Object.class);
+                cache = cacheManager.getCache(cacheName, Object.class);
             } catch (Exception e) {
                 LOGGER.info("Cache {} not found, creating it with default configuration.", cacheName);
-                cache = cacheService.create(cacheName, CacheConfig.create().build(), Object.class);
+                cache = cacheManager.createCache(cacheName, CacheConfig.create().build(), Object.class);
             }
             String key = CacheKeyGenerator.generate(method, args);
             Object value = cache.get(key);

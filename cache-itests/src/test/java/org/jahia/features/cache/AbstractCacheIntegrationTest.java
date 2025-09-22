@@ -15,18 +15,13 @@
  */
 package org.jahia.features.cache;
 
+import org.apache.karaf.features.Feature;
+import org.apache.karaf.features.FeaturesService;
 import org.apache.karaf.itests.KarafTestSupport;
-import org.jahia.features.cache.api.Cache;
 import org.jahia.features.cache.api.CacheConfig;
-import org.jahia.features.cache.api.CacheService;
+import org.jahia.features.cache.api.CacheManager;
 import org.jahia.features.cache.sample.BasicCacheSampleService;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.ops4j.pax.exam.Configuration;
-import org.ops4j.pax.exam.Option;
-import org.ops4j.pax.exam.junit.PaxExam;
-import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
-import org.ops4j.pax.exam.spi.reactors.PerClass;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
@@ -37,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.*;
@@ -45,30 +41,45 @@ import static org.ops4j.pax.exam.karaf.options.KarafDistributionOption.debugConf
 import static org.ops4j.pax.exam.karaf.options.KarafDistributionOption.editConfigurationFilePut;
 
 /**
+ * Base class for cache integration tests that provides common test scenarios.
+ *
  * @author Jerome Blanchard
  */
-@RunWith(PaxExam.class)
-@ExamReactorStrategy(PerClass.class)
-public class CacheIntegrationTest extends KarafTestSupport {
+public abstract class AbstractCacheIntegrationTest extends KarafTestSupport {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(CacheIntegrationTest.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractCacheIntegrationTest.class);
 
     @Inject
-    private BundleContext bundleContext;
+    protected BundleContext bundleContext;
 
-    @Configuration
-    public Option[] config() {
-        List<Option> options = new LinkedList<>();
+    @Inject
+    protected FeaturesService featuresService;
+
+    /**
+     * Returns the feature name to install for this specific cache provider.
+     */
+    protected abstract String getFeatureName();
+
+    /**
+     * Returns the expected provider name for this cache implementation.
+     */
+    protected abstract String getExpectedProviderName();
+
+    protected org.ops4j.pax.exam.Option[] createBaseConfig() {
+        List<org.ops4j.pax.exam.Option> options = new LinkedList<>();
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache.name","org.jahia.features.cache"));
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache.level","INFO"));
+        options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-whiteboard.name","org.jahia.features.cache.core.internal"));
+        options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-whiteboard.level","DEBUG"));
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-sample.name","org.jahia.features.cache.sample"));
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-sample.level","DEBUG"));
+
         String karafDebug = System.getProperty("it.karaf.debug");
         if (karafDebug != null) {
             LOGGER.warn("Found system Karaf Debug system property, activating configuration: {}", karafDebug);
             String port = "5006";
             boolean hold = true;
-            if (karafDebug.trim().isEmpty()) {
+            if (!karafDebug.trim().isEmpty()) {
                 String[] debugOptions = karafDebug.split(",");
                 for (String debugOption : debugOptions) {
                     String[] debugOptionParts = debugOption.split(":");
@@ -82,44 +93,70 @@ public class CacheIntegrationTest extends KarafTestSupport {
             }
             options.add(0, debugConfiguration(port, hold));
         }
-        return Stream.concat(Stream.of(super.config()), options.stream()).toArray(Option[]::new);
+        return Stream.concat(Stream.of(super.config()), options.stream()).toArray(org.ops4j.pax.exam.Option[]::new);
     }
 
     @Test
     public void testCacheService() throws Exception {
-        LOGGER.info("Testing Cache service");
+        LOGGER.info("Testing Cache service with provider: {}", getExpectedProviderName());
+        Feature[] featuresBefore = featuresService.listInstalledFeatures();
 
-        // Install MyScheduler feature
-        addFeaturesRepository(maven("org.jahia.features.cache", "cache-features").type("xml").classifier("features").version("1.0.0-SNAPSHOT").getURL());
-        installAndAssertFeature("cache");
+        if (getFeatureName() != null) {
+            addFeaturesRepository(
+                    maven("org.jahia.features.cache", "cache-features")
+                            .type("xml")
+                            .classifier("features")
+                            .version("1.0.0-SNAPSHOT")
+                            .getURL());
+            installAndAssertFeature(getFeatureName());
+        }
 
         // Check that bundle exists and retrieve the service
         assertCacheBundleExists();
-        ServiceReference<?> cacheServiceRef = bundleContext.getServiceReference(CacheService.class.getName());
+        ServiceReference<?> cacheServiceRef = bundleContext.getServiceReference(CacheManager.class.getName());
         assertNotNull("CacheService is NOT available", cacheServiceRef);
-        CacheService cacheService = (CacheService) bundleContext.getService(cacheServiceRef);
-        assertNotNull("Unable to get CacheService reference", cacheService);
-        int cacheCount = cacheService.list().size();
-        LOGGER.info("1. Caches list size {}", cacheCount);
+        CacheManager cacheManager = (CacheManager) bundleContext.getService(cacheServiceRef);
+        assertNotNull("Unable to get CacheService reference", cacheManager);
+        cacheManager.clearAll();
+
+        // Test provider name
+        assertEquals("Wrong cache provider name", getExpectedProviderName(), cacheManager.getCacheProviderName());
+        LOGGER.info("Cache provider name verified: {}", cacheManager.getCacheProviderName());
+
+        int cacheCount = cacheManager.listCacheNames().size();
+        LOGGER.info("1. Initial caches list size {}", cacheCount);
         assertEquals("CacheService should not have any cache at this point", 0, cacheCount);
 
         // Test a programmatic cache creation
         String testCacheName = "testCache";
-        Cache<String> testCache = cacheService.create(testCacheName, CacheConfig.create().timeToLive(10).maxEntries(10).build(), String.class);
-        assertTrue("Cache " + testCacheName + " not found in cache service", cacheService.list().contains(testCacheName));
-        cacheCount = cacheService.list().size();
-        LOGGER.info("2. Cache list size {}", cacheCount);
+        LOGGER.info("2. Create a cache {} using programing API", testCacheName);
+        cacheManager.createCache(testCacheName, CacheConfig.create().timeToLive(10).maxEntries(10).build(), String.class);
+        assertTrue("Cache " + testCacheName + " not found in cache service", cacheManager.listCacheNames().contains(testCacheName));
+        cacheCount = cacheManager.listCacheNames().size();
+        LOGGER.info("2.1. After create cache list size {} (should be 1)", cacheCount);
         assertEquals("Cache service should have one cache at this point", 1, cacheCount);
 
-        // Install a sample bundle with a service having some methodes annotated with @CacheResult
+        // Install a sample bundle with a service having some methods annotated with @CacheResult
+        LOGGER.info("3. Install the sample bundle with a service using @CacheResult annotation ...");
         Bundle basicCacheBundle = bundleContext.installBundle(maven("org.jahia.features", "cache-basic-sample").type("jar").version("1.0.0-SNAPSHOT").getURL());
         assertNotNull("Unable to install basic cache sample bundle", basicCacheBundle);
         basicCacheBundle.start();
-        LOGGER.info("Bundle cache-basic-sample installed. State: {}", getBundleStateAsString(basicCacheBundle.getState()));
-        assertEquals("Bundle is not is ACTIVE state", Bundle.ACTIVE, basicCacheBundle.getState());
+        LOGGER.info("3.1. Bundle cache-basic-sample installed. State: {}", getBundleStateAsString(basicCacheBundle.getState()));
+        assertEquals("Bundle is not in ACTIVE state", Bundle.ACTIVE, basicCacheBundle.getState());
         ServiceReference<?>[] refs = bundleContext.getServiceReferences("org.jahia.features.cache.sample.BasicCacheSampleService", null);
         assertNotNull("No service references found for BasicCacheSampleService", refs);
-        assertTrue("No service references found for BasicCacheSampleService", refs.length > 0);
+        LOGGER.info("3.2. Looking for BasicCacheSampleService references to check if proxy one is the highest ranking one...");
+        ServiceReference<?>[] allRefs = bundleContext.getAllServiceReferences(null, null);
+        if (allRefs != null) {
+            for (ServiceReference<?> ref : allRefs) {
+                String[] classes = (String[]) ref.getProperty(Constants.OBJECTCLASS);
+                for (String clazz : classes) {
+                    if (clazz.contains("BasicCacheSampleService")) {
+                        LOGGER.info("3.3. Found BasicCacheSampleService: {} with ranking: {}", clazz, ref.getProperty(Constants.SERVICE_RANKING));
+                    }
+                }
+            }
+        }
         ServiceReference<?> basicCacheSampleServiceRef = refs[0];
         int highestRanking = Integer.MIN_VALUE;
         for (ServiceReference<?> ref : refs) {
@@ -133,34 +170,35 @@ public class CacheIntegrationTest extends KarafTestSupport {
         BasicCacheSampleService basicCacheService = (BasicCacheSampleService) bundleContext.getService(basicCacheSampleServiceRef);
         assertNotNull("Unable to get BasicCacheSampleService proxy", basicCacheService);
 
-        // Call a sample service methode and check the cache is used
+        // Test the use of service methods to check that the cache proxy is working as expected
+        LOGGER.info("4. Call the sample service method getValue() and check the cache is used as expected...");
         String value1 = basicCacheService.getValue();
-
-        cacheCount = cacheService.list().size();
-        LOGGER.info("3. Caches list size {}", cacheCount);
+        cacheCount = cacheManager.listCacheNames().size();
+        LOGGER.info("4.1. After first method call caches list size {} (should be 2)", cacheCount);
         assertEquals("CacheService should have a new cache at this point", 2, cacheCount);
-        LOGGER.info("4.1. Sample service getValue first call  {}", value1);
+        LOGGER.info("4.2. Sample service getValue first call value:  {}", value1);
         String value2 = basicCacheService.getValue();
-        LOGGER.info("4.2. Sample service getValue second call {}", value2);
+        LOGGER.info("4.3. Sample service getValue second call value: {} (should be the same as first call)", value2);
         assertEquals("Value should be the same (taken from cache)", value1, value2);
 
-        // Try to uninstall the bundle and check the caches are removed
+        // Uninstall the sample bundle and check that the cache has been purged (not implemented yet)
         LOGGER.info("5. Uninstall the sample bundle ...");
         bundleContext.ungetService(basicCacheSampleServiceRef);
         basicCacheBundle.stop();
         basicCacheBundle.uninstall();
-        LOGGER.info("Basic Cache Sample uninstalled, wait a little bit and check cache list size...");
+        LOGGER.info("5.1. Basic Cache Sample uninstalled, wait a little bit and check cache list size...");
         Thread.sleep(500);
-
-        // Check that the cache list does not contain the cache created by the sample bundle
-        cacheCount = cacheService.list().size();
-        LOGGER.info("6. Caches list size {}", cacheCount);
-        assertEquals("CacheService should not have any cache at this point", 2, cacheCount);
-
+        cacheCount = cacheManager.listCacheNames().size();
+        LOGGER.info("5.2. After uninstall bundle caches list size {} (should be one but not implemented yet)", cacheCount);
+        assertEquals("CacheService should have two caches at this point because purge of cache name is not implemented yet", 2, cacheCount);
         bundleContext.ungetService(cacheServiceRef);
+
+        // Uninstall the feature.
+        LOGGER.info("6. Uninstall the feature");
+        uninstallNewFeatures(Set.of(featuresBefore));
     }
 
-    private void assertCacheBundleExists() {
+    protected void assertCacheBundleExists() {
         boolean bundleFound = false;
         for (Bundle bundle : bundleContext.getBundles()) {
             if (bundle.getSymbolicName().contains("cache-core")) {
@@ -174,7 +212,7 @@ public class CacheIntegrationTest extends KarafTestSupport {
         assertTrue("Bundle cache-core not found", bundleFound);
     }
 
-    private String getBundleStateAsString(int state) {
+    protected String getBundleStateAsString(int state) {
         switch (state) {
             case Bundle.UNINSTALLED: return "UNINSTALLED";
             case Bundle.INSTALLED: return "INSTALLED";

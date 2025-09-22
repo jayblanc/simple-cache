@@ -13,28 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jahia.features.cache.core.internal;
+package org.jahia.features.cache.hazelcast;
 
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.replicatedmap.ReplicatedMap;
 import org.jahia.features.cache.api.Cache;
 import org.jahia.features.cache.api.CacheConfig;
 import org.jahia.features.cache.api.CacheEntry;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
+ * Hazelcast-based clustered cache implementation
+ *
  * @author Jerome Blanchard
  */
-public class InMemoryCache<T> implements Cache<T> {
+public class HazelcastCache<T> implements Cache<T> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HazelcastCache.class);
 
     private final String cacheName;
     private final CacheConfig cacheConfig;
-    private final Map<String, CacheEntry<T>> entries;
+    private final ReplicatedMap<String, CacheEntry<T>> hazelcastMap;
 
-    public InMemoryCache(String cacheName, CacheConfig cacheConfig) {
+    public HazelcastCache(HazelcastInstance hazelcastInstance, String cacheName, CacheConfig cacheConfig) {
         this.cacheName = cacheName;
         this.cacheConfig = cacheConfig;
-        this.entries = new LinkedHashMap<>(16, 0.75f, true);
+        this.hazelcastMap = hazelcastInstance.getReplicatedMap(cacheName);
+        LOGGER.info("Created hazelcast cache: {}", cacheName);
     }
 
     @Override
@@ -48,15 +54,12 @@ public class InMemoryCache<T> implements Cache<T> {
     }
 
     @Override
-    public synchronized CacheEntry<T> getEntry(String key) {
-        CacheEntry<T> entry = entries.get(key);
+    public CacheEntry<T> getEntry(String key) {
+        CacheEntry<T> entry = hazelcastMap.get(key);
         if (entry != null) {
-            if (System.currentTimeMillis() - entry.created() < getConfig().getTimeToLive() * 1000L) {
-                entry.touch();
-                return entry;
-            } else {
-                entries.remove(key);
-            }
+            entry.touch();
+            hazelcastMap.put(key, entry); // Mise à jour du timestamp accessed
+            return entry;
         }
         return null;
     }
@@ -64,32 +67,27 @@ public class InMemoryCache<T> implements Cache<T> {
     @Override
     public T get(String key) {
         CacheEntry<T> entry = getEntry(key);
-        return (entry !=null) ? entry.value() : null;
+        return (entry != null) ? entry.value() : null;
     }
 
     @Override
-    public synchronized CacheEntry<T> put(String key, T value) {
+    public CacheEntry<T> put(String key, T value) {
         CacheEntry<T> entry = new CacheEntry<>(key, value);
-        CacheEntry<T> old = entries.put(entry.key(), entry);
-        if (getConfig().getMaxEntries() > 0 && entries.size() >= (getConfig().getMaxEntries() + 1)) {
-            CacheEntry<T> eldest = entries.values().iterator().next();
-            entries.remove(eldest.key());
-        }
-        return old;
+        return hazelcastMap.put(key, entry);
     }
 
     @Override
-    public synchronized void clear() {
-        entries.clear();
-    }
-
-    @Override
-    public synchronized CacheEntry<T> delete(String key) {
-        return entries.remove(key);
+    public CacheEntry<T> delete(String key) {
+        return hazelcastMap.remove(key);
     }
 
     @Override
     public int size() {
-        return entries.size();
+        return hazelcastMap.size();
+    }
+
+    @Override
+    public void clear() {
+        hazelcastMap.clear();
     }
 }

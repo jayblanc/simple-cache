@@ -8,19 +8,13 @@
         <artifactId>cache</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>cache-core</artifactId>
+    <artifactId>cache-infinispan</artifactId>
     <packaging>bundle</packaging>
 
     <dependencies>
         <dependency>
             <groupId>org.jahia.features.cache</groupId>
             <artifactId>cache-api</artifactId>
-            <version>${project.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jahia.features.cache</groupId>
-            <artifactId>cache-infinispan</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
@@ -35,44 +29,24 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.karaf.features</groupId>
-            <artifactId>org.apache.karaf.features.core</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.infinispan</groupId>
-            <artifactId>infinispan-core</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.infinispan</groupId>
-            <artifactId>infinispan-commons</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
+            <groupId>org.infinispan</groupId>
+            <artifactId>infinispan-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.infinispan</groupId>
+            <artifactId>infinispan-commons</artifactId>
+        </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -87,15 +61,31 @@
             <plugin>
                 <groupId>org.apache.felix</groupId>
                 <artifactId>maven-bundle-plugin</artifactId>
+                <extensions>true</extensions>
                 <configuration>
                     <instructions>
                         <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
-                        <Import-Package>*</Import-Package>
-                        <Embed-Dependency>*;scope=compile|runtime</Embed-Dependency>
+                        <Import-Package>
+                            !org.infinispan.*,
+                            !org.jgroups.*,
+                            !org.jboss.*,
+                            !com.google.errorprone.*,
+                            !javax.annotation.*,
+                            !sun.misc.*,
+                            !sun.nio.ch.*,
+                            *;resolution:=optional
+                        </Import-Package>
+                        <Export-Package>
+                            org.jahia.features.cache.infinispan,
+                            org.infinispan.*;version="${infinispan.version}"
+                        </Export-Package>
+                        <Embed-Dependency>
+                            infinispan-core,
+                            infinispan-commons,
+                            *;scope=compile|runtime
+                        </Embed-Dependency>
                         <Embed-Transitive>true</Embed-Transitive>
-                        <Export-Package>org.jahia.features.cache.core</Export-Package>
-                        <Private-Package>org.jahia.features.cache.core.internal</Private-Package>
-                        <Provide-Capability>osgi.service;objectClass=org.jahia.features.cache.api.CacheManager</Provide-Capability>
+                        <Provide-Capability>osgi.service;objectClass=org.jahia.features.cache.infinispan.InfinispanCacheProvider</Provide-Capability>
                     </instructions>
                 </configuration>
             </plugin>

@@ -20,15 +20,17 @@ import java.util.List;
 /**
  * @author Jerome Blanchard
  */
-public interface CacheService {
+public interface CacheManager {
 
-    List<String> list();
+    String getCacheProviderName();
 
-    <T> Cache<T> create(String name, CacheConfig config, Class<T> type) throws CacheAlreadyExistsException;
+    List<String> listCacheNames();
 
-    <T> Cache<T> get(String name, Class<T> type) throws CacheNotFoundException;
+    <T> Cache<T> createCache(String name, CacheConfig config, Class<T> type) throws CacheAlreadyExistsException;
 
-    void clear(String name) throws CacheNotFoundException;
+    <T> Cache<T> getCache(String name, Class<T> type) throws CacheNotFoundException;
+
+    void clearCache(String name) throws CacheNotFoundException;
 
     void clearAll();
 
