@@ -7,7 +7,7 @@ Built on OSGi architecture, this modular caching solution enables developers to 
 
 - **Zero-Configuration Caching**: Add caching to any method with a single annotation
 - **Automatic Cache Management**: Smart cache creation, key generation, and lifecycle management
-- **Dual Cache Strategies**: In-memory for single instances, clustered (Infinispan) for distributed environments
+- **Multiple Cache Strategies**: In-memory for single instances, Hazelcast and Infinispan for distributed environments
 - **Programmatic API**: Full control when you need it, with a clean and intuitive interface
 - **OSGi Integration**: Native support for dynamic service registration and dependency injection
 - **Production Ready**: Comprehensive test coverage and battle-tested in enterprise environments
@@ -17,7 +17,9 @@ Built on OSGi architecture, this modular caching solution enables developers to 
 ```
 cache/
 ├── cache-api/          # Core interfaces and annotations
-├── cache-core/         # Implementation with in-memory and clustered caching
+├── cache-core/         # Core implementation with in-memory caching
+├── cache-hazelcast/    # Hazelcast distributed caching implementation
+├── cache-infinispan/   # Infinispan distributed caching implementation
 ├── cache-features/     # Karaf feature definitions for easy deployment
 ├── cache-itests/       # Comprehensive integration tests
 └── cache-samples/      # Working examples and usage patterns
@@ -137,11 +139,11 @@ When you need fine-grained control, use the programmatic API:
 public class AdvancedCacheService {
     
     @Reference
-    private CacheService cacheManager;
+    private CacheManager cacheManager;
     
     public void demonstrateProgrammaticUsage() {
         // Create a custom cache with specific configuration
-        Cache<String> myCache = cacheManager.create(
+        Cache<String> myCache = cacheManager.createCache(
             "customCache",
             CacheConfig.create()
                 .maxEntries(5000)
@@ -170,22 +172,110 @@ public class AdvancedCacheService {
     public User getUser(String id) {
         try {
             // Get an existing cache
-            Cache<User> userCache = cacheManager.get("userCache", User.class);
+            Cache<User> userCache = cacheManager.getCache("userCache", User.class);
             
             // Perform operations
             User user = userCache.get(id);
             if (user == null) {
-                user = loadUserFromDatabase("123");
-                userCache.put("user:123", user);
+                user = loadUserFromDatabase(id);
+                userCache.put("user:" + id, user);
             }
             return user;
         } catch (CacheNotFoundException e) {
             // Handle cache not found
             System.err.println("Cache not found: " + e.getMessage());
+            return null;
         }
     }
 }
 ```
+
+### 4. Advanced Key Management
+
+For fine-grained control over cache key generation, use the `@CacheKey` annotation:
+
+```java
+public interface UserService {
+    @CacheResult(cacheName = "userCache")
+    User getUser(@CacheKey String userId, String extraParam);
+    
+    @CacheResult(cacheName = "userCache") 
+    User getUserByEmail(@CacheKey String email, boolean includeInactive);
+}
+```
+
+**Key Benefits:**
+- Only annotated parameters contribute to the cache key
+- Reduces key complexity when methods have many parameters
+- Provides predictable cache behavior
+
+## Cache Implementation Variants
+
+The framework offers multiple cache implementations that can be deployed independently based on your requirements:
+
+### Available Features
+
+```bash
+# Core caching functionality (always required)
+feature:install cache
+
+# Distributed caching options (choose one based on your needs)
+feature:install cache-hazelcast    # For Hazelcast-based clustering
+feature:install cache-infinispan   # For Infinispan-based clustering
+
+# Sample applications
+feature:install cache-basic-sample # Basic usage examples
+```
+
+### Choosing Your Cache Strategy
+
+#### In-Memory Cache (Default)
+```bash
+feature:install cache
+```
+- **Use Case**: Single-instance applications, development, testing
+- **Features**: Fast local caching with minimal overhead
+- **Memory**: Low footprint
+- **Persistence**: None
+
+#### Hazelcast Distributed Cache
+```bash
+feature:install cache-hazelcast
+```
+- **Use Case**: Distributed applications requiring high availability
+- **Features**: Auto-discovery, partition tolerance, near caches
+- **Memory**: Medium footprint
+- **Persistence**: Optional (configurable)
+
+#### Infinispan Distributed Cache
+```bash
+feature:install cache-infinispan
+```
+- **Use Case**: Enterprise environments with complex clustering requirements
+- **Features**: Advanced clustering modes, persistence, transactions
+- **Memory**: Medium-high footprint
+- **Persistence**: Advanced (multiple modes available)
+
+### Installation Examples
+
+```bash
+# For a simple single-node deployment
+feature:repo-add mvn:org.jahia.features.cache/cache-features/1.0.0-SNAPSHOT/xml/features
+feature:install cache
+
+# For a Hazelcast cluster
+feature:repo-add mvn:org.jahia.features.cache/cache-features/1.0.0-SNAPSHOT/xml/features
+feature:install cache-hazelcast
+
+# For an enterprise Infinispan cluster
+feature:repo-add mvn:org.jahia.features.cache/cache-features/1.0.0-SNAPSHOT/xml/features
+feature:install cache-infinispan
+
+# Install with samples for testing
+feature:install cache-basic-sample
+```
+
+**Note**: Each distributed cache feature automatically includes the base `cache` feature as a dependency.
 
 ## Advanced Configuration
 
@@ -200,7 +290,7 @@ CacheConfig config = CacheConfig.create()
 Cache<String> cache = cacheManager.create("myCache", config, String.class);
 ```
 
-### Clustered vs In-Memory Caching
+### Clustered Vs In-Memory Caching
 
 The framework automatically detects the environment:
 
