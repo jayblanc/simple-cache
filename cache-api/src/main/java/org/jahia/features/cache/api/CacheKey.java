@@ -15,8 +15,15 @@
  */
 package org.jahia.features.cache.api;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 /**
  * @author Jerome Blanchard
  */
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.PARAMETER})
 public @interface CacheKey {
 }

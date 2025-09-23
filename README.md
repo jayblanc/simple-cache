@@ -204,10 +204,30 @@ public interface UserService {
 }
 ```
 
+#### Cache Key Generation Behavior
+
+The `@CacheKey` annotation controls which method parameters are used for cache key generation:
+
+1. **No @CacheKey annotations**: All method parameters are included in the cache key
+   ```java
+   @CacheResult(cacheName = "userCache")
+   User getUser(String userId, String department, boolean active);
+   // Cache key will include: userId, department, active
+   ```
+
+2. **At least one @CacheKey annotation**: Only annotated parameters are included in the cache key
+   ```java
+   @CacheResult(cacheName = "userCache")
+   User getUser(@CacheKey String userId, String department, @CacheKey boolean active);
+   // Cache key will include only: userId, active
+   // The 'department' parameter is ignored for caching
+   ```
+
 **Key Benefits:**
-- Only annotated parameters contribute to the cache key
-- Reduces key complexity when methods have many parameters
-- Provides predictable cache behavior
+- **Selective caching**: Include only relevant parameters in cache keys
+- **Performance optimization**: Reduce key complexity when methods have many parameters
+- **Predictable behavior**: Explicit control over what affects cache invalidation
+- **Backward compatibility**: Existing methods without annotations continue to work unchanged
 
 ## Cache Implementation Variants
 

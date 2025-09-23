@@ -73,7 +73,7 @@ public class InfinispanCache<T> implements Cache<T> {
         CacheEntry<T> entry = infinispanCache.get(key);
         if (entry != null) {
             entry.touch();
-            infinispanCache.put(key, entry); // Mise à jour du timestamp accessed
+            infinispanCache.put(key, entry); // Update accessed timestamp
             return entry;
         }
         return null;

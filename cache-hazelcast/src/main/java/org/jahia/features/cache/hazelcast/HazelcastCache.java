@@ -58,7 +58,7 @@ public class HazelcastCache<T> implements Cache<T> {
         CacheEntry<T> entry = hazelcastMap.get(key);
         if (entry != null) {
             entry.touch();
-            hazelcastMap.put(key, entry); // Mise à jour du timestamp accessed
+            hazelcastMap.put(key, entry); // Update accessed timestamp
             return entry;
         }
         return null;

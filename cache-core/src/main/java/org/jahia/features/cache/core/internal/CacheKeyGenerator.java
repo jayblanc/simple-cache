@@ -17,11 +17,16 @@ package org.jahia.features.cache.core.internal;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.jahia.features.cache.api.CacheKey;
+
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 
 /**
  * @author Jerome Blanchard
@@ -41,7 +46,10 @@ public class CacheKeyGenerator {
                                     .map(Class::getName)
                                     .toArray(String[]::new)
                     ) + ")";
-            String paramsJson = mapper.writeValueAsString(args != null ? args : new Object[0]);
+
+            Object[] keyParams = getKeyParameters(method, args);
+
+            String paramsJson = mapper.writeValueAsString(keyParams);
             String rawKey = signature + ":" + paramsJson;
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(rawKey.getBytes(StandardCharsets.UTF_8));
@@ -49,5 +57,46 @@ public class CacheKeyGenerator {
         } catch (Exception e) {
             throw new RuntimeException("Cache key generation failed", e);
         }
+    }
+
+    /**
+     * Determines which parameters to use for cache key generation.
+     * If no parameter is annotated with @CacheKey, all parameters are used.
+     * If at least one parameter is annotated with @CacheKey, only annotated parameters are used.
+     *
+     * @param method the method for which to generate the key
+     * @param args the method arguments
+     * @return the parameters to use for cache key generation
+     */
+    private static Object[] getKeyParameters(Method method, Object[] args) {
+        if (args == null || args.length == 0) {
+            return new Object[0];
+        }
+
+        Parameter[] parameters = method.getParameters();
+        List<Object> keyParams = new ArrayList<>();
+        boolean hasCacheKeyAnnotation = false;
+
+        // Check if at least one parameter has the @CacheKey annotation
+        for (Parameter parameter : parameters) {
+            if (parameter.isAnnotationPresent(CacheKey.class)) {
+                hasCacheKeyAnnotation = true;
+                break;
+            }
+        }
+
+        // If no @CacheKey annotation is present, use all parameters
+        if (!hasCacheKeyAnnotation) {
+            return args;
+        }
+
+        // If at least one @CacheKey annotation is present, use only annotated parameters
+        for (int i = 0; i < parameters.length; i++) {
+            if (parameters[i].isAnnotationPresent(CacheKey.class)) {
+                keyParams.add(args[i]);
+            }
+        }
+
+        return keyParams.toArray();
     }
 }
