@@ -39,7 +39,7 @@ public class ValueServiceImpl implements ValueService {
 
     @Override
     @CacheResult(cacheName = CACHE_NAME)
-    public String getValue(String key) {
+    public String getValue(@CacheKey String key) {
         LOGGER.info("Getting value for key: {}", key);
         String storedValue = keyValueStore.getOrDefault(key, "not found");
         return "Value for key '" + key + "' at " + System.currentTimeMillis() + " is: " + storedValue;

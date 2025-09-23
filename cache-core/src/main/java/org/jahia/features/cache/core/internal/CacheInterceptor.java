@@ -57,7 +57,7 @@ public class CacheInterceptor implements InvocationHandler {
             LOGGER.info("Method requires cache invalidation for cache: {}", cacheName);
             try {
                 Cache<Object> cache = cacheManager.getCache(cacheName, Object.class);
-                String key = CacheKeyGenerator.generate(method, args);
+                String key = CacheKeyGenerator.generate(method, args, target);
                 cache.delete(key);
                 LOGGER.info("Cache entry with key: {} evicted from cache: {}", key, cacheName);
             } catch (Exception e) {
@@ -91,7 +91,7 @@ public class CacheInterceptor implements InvocationHandler {
                 LOGGER.info("Cache {} not found, creating it with default configuration.", cacheName);
                 cache = cacheManager.createCache(cacheName, CacheConfig.create().build(), Object.class);
             }
-            String key = CacheKeyGenerator.generate(method, args);
+            String key = CacheKeyGenerator.generate(method, args, target);
             Object value = cache.get(key);
             if (value != null) {
                 LOGGER.info("Cache hit for key: {} in cache: {}", key, cacheName);

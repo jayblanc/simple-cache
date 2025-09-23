@@ -69,8 +69,8 @@ public abstract class AbstractCacheIntegrationTest extends KarafTestSupport {
         List<org.ops4j.pax.exam.Option> options = new LinkedList<>();
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache.name","org.jahia.features.cache"));
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache.level","INFO"));
-        options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-whiteboard.name","org.jahia.features.cache.core.internal"));
-        options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-whiteboard.level","DEBUG"));
+        options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-core.name","org.jahia.features.cache.core.internal"));
+        options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-core.level","DEBUG"));
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-sample.name","org.jahia.features.cache.sample"));
         options.add(editConfigurationFilePut("etc/org.ops4j.pax.logging.cfg","log4j2.logger.cache-sample.level","DEBUG"));
 
@@ -138,7 +138,7 @@ public abstract class AbstractCacheIntegrationTest extends KarafTestSupport {
 
         // Install a sample bundle with a service having some methods annotated with @CacheResult
         LOGGER.info("3. Install the sample bundle with a service using @CacheResult annotation ...");
-        Bundle basicCacheBundle = bundleContext.installBundle(maven("org.jahia.features", "cache-basic-sample").type("jar").version("1.0.0-SNAPSHOT").getURL());
+        Bundle basicCacheBundle = bundleContext.installBundle(maven("org.jahia.features.cache", "cache-basic-sample").type("jar").version("1.0.0-SNAPSHOT").getURL());
         assertNotNull("Unable to install basic cache sample bundle", basicCacheBundle);
         basicCacheBundle.start();
         LOGGER.info("3.1. Bundle cache-basic-sample installed. State: {}", getBundleStateAsString(basicCacheBundle.getState()));
@@ -185,13 +185,14 @@ public abstract class AbstractCacheIntegrationTest extends KarafTestSupport {
         String value3 = valueService.getValue("myKey");
         LOGGER.info("4.5. Sample service getValue third call value: {} (should have been evicted by update)", value3);
         assertTrue("Value should contains plop", value3.contains("plop"));
-        assertEquals("Value should not be the same (invalidated)", value1, value3);
+        assertNotEquals("Value should not be the same (invalidated)", value1, value3);
         LOGGER.info("4.6. Clear all values");
         valueService.clearAllValues();
         String value4 = valueService.getValue("myKey");
         LOGGER.info("4.7. Sample service getValue fourth call value: {} (should have been purge)", value3);
         assertFalse("Value should NO MORE contains plop", value4.contains("plop"));
-        assertEquals("Value should not be the same (purged)", value3, value4);
+        assertNotEquals("Value should not be the same (purged)", value3, value4);
+        assertNotEquals("Value should not be the same (purged)", value1, value4);
 
         // Uninstall the sample bundle and check that the cache has been purged (not implemented yet)
         LOGGER.info("5. Uninstall the sample bundle ...");

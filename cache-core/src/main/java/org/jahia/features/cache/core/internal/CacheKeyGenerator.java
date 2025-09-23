@@ -90,6 +90,7 @@ public class CacheKeyGenerator {
             }
         }
 
+        LOGGER.info("Generating cache key with components: {}", keyComponents);
         return generateHashKey(keyComponents);
     }
 
