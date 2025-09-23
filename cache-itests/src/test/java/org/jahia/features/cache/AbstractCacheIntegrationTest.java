@@ -20,7 +20,7 @@ import org.apache.karaf.features.FeaturesService;
 import org.apache.karaf.itests.KarafTestSupport;
 import org.jahia.features.cache.api.CacheConfig;
 import org.jahia.features.cache.api.CacheManager;
-import org.jahia.features.cache.sample.BasicCacheSampleService;
+import org.jahia.features.cache.sample.ValueService;
 import org.junit.Test;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -143,47 +143,59 @@ public abstract class AbstractCacheIntegrationTest extends KarafTestSupport {
         basicCacheBundle.start();
         LOGGER.info("3.1. Bundle cache-basic-sample installed. State: {}", getBundleStateAsString(basicCacheBundle.getState()));
         assertEquals("Bundle is not in ACTIVE state", Bundle.ACTIVE, basicCacheBundle.getState());
-        ServiceReference<?>[] refs = bundleContext.getServiceReferences("org.jahia.features.cache.sample.BasicCacheSampleService", null);
-        assertNotNull("No service references found for BasicCacheSampleService", refs);
-        LOGGER.info("3.2. Looking for BasicCacheSampleService references to check if proxy one is the highest ranking one...");
+        ServiceReference<?>[] refs = bundleContext.getServiceReferences("org.jahia.features.cache.sample.ValueService", null);
+        assertNotNull("No service references found for ValueService", refs);
+        LOGGER.info("3.2. Looking for ValueService references to check if proxy one is the highest ranking one...");
         ServiceReference<?>[] allRefs = bundleContext.getAllServiceReferences(null, null);
         if (allRefs != null) {
             for (ServiceReference<?> ref : allRefs) {
                 String[] classes = (String[]) ref.getProperty(Constants.OBJECTCLASS);
                 for (String clazz : classes) {
-                    if (clazz.contains("BasicCacheSampleService")) {
-                        LOGGER.info("3.3. Found BasicCacheSampleService: {} with ranking: {}", clazz, ref.getProperty(Constants.SERVICE_RANKING));
+                    if (clazz.contains("ValueService")) {
+                        LOGGER.info("3.3. Found ValueService: {} with ranking: {}", clazz, ref.getProperty(Constants.SERVICE_RANKING));
                     }
                 }
             }
         }
-        ServiceReference<?> basicCacheSampleServiceRef = refs[0];
+        ServiceReference<?> valueServiceRef = refs[0];
         int highestRanking = Integer.MIN_VALUE;
         for (ServiceReference<?> ref : refs) {
             Object rankingObj = ref.getProperty(Constants.SERVICE_RANKING);
             int ranking = rankingObj instanceof Integer ? (Integer) rankingObj : 0;
             if (ranking > highestRanking) {
                 highestRanking = ranking;
-                basicCacheSampleServiceRef = ref;
+                valueServiceRef = ref;
             }
         }
-        BasicCacheSampleService basicCacheService = (BasicCacheSampleService) bundleContext.getService(basicCacheSampleServiceRef);
-        assertNotNull("Unable to get BasicCacheSampleService proxy", basicCacheService);
+        ValueService valueService = (ValueService) bundleContext.getService(valueServiceRef);
+        assertNotNull("Unable to get ValueService proxy", valueService);
 
         // Test the use of service methods to check that the cache proxy is working as expected
         LOGGER.info("4. Call the sample service method getValue() and check the cache is used as expected...");
-        String value1 = basicCacheService.getValue();
+        String value1 = valueService.getValue("myKey");
         cacheCount = cacheManager.listCacheNames().size();
         LOGGER.info("4.1. After first method call caches list size {} (should be 2)", cacheCount);
         assertEquals("CacheService should have a new cache at this point", 2, cacheCount);
         LOGGER.info("4.2. Sample service getValue first call value:  {}", value1);
-        String value2 = basicCacheService.getValue();
+        String value2 = valueService.getValue("myKey");
         LOGGER.info("4.3. Sample service getValue second call value: {} (should be the same as first call)", value2);
         assertEquals("Value should be the same (taken from cache)", value1, value2);
+        LOGGER.info("4.4. Update Sample service value to:  plop");
+        valueService.updateValue("myKey", "plop");
+        String value3 = valueService.getValue("myKey");
+        LOGGER.info("4.5. Sample service getValue third call value: {} (should have been evicted by update)", value3);
+        assertTrue("Value should contains plop", value3.contains("plop"));
+        assertEquals("Value should not be the same (invalidated)", value1, value3);
+        LOGGER.info("4.6. Clear all values");
+        valueService.clearAllValues();
+        String value4 = valueService.getValue("myKey");
+        LOGGER.info("4.7. Sample service getValue fourth call value: {} (should have been purge)", value3);
+        assertFalse("Value should NO MORE contains plop", value4.contains("plop"));
+        assertEquals("Value should not be the same (purged)", value3, value4);
 
         // Uninstall the sample bundle and check that the cache has been purged (not implemented yet)
         LOGGER.info("5. Uninstall the sample bundle ...");
-        bundleContext.ungetService(basicCacheSampleServiceRef);
+        bundleContext.ungetService(valueServiceRef);
         basicCacheBundle.stop();
         basicCacheBundle.uninstall();
         LOGGER.info("5.1. Basic Cache Sample uninstalled, wait a little bit and check cache list size...");

@@ -15,88 +15,142 @@
  */
 package org.jahia.features.cache.core.internal;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import org.jahia.features.cache.api.CacheKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 
 /**
+ * Generates cache keys based on method signatures and parameters.
+ * Supports @CacheKey annotations to control which parameters are included.
+ *
  * @author Jerome Blanchard
  */
 public class CacheKeyGenerator {
 
-    private static final ObjectMapper mapper = new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-
-    private CacheKeyGenerator() {}
-
-    public static String generate(Method method, Object[] args) {
-        try {
-            String signature = method.getDeclaringClass().getName() + "." +
-                    method.getName() + "(" +
-                    String.join(",",
-                            Arrays.stream(method.getParameterTypes())
-                                    .map(Class::getName)
-                                    .toArray(String[]::new)
-                    ) + ")";
-
-            Object[] keyParams = getKeyParameters(method, args);
-
-            String paramsJson = mapper.writeValueAsString(keyParams);
-            String rawKey = signature + ":" + paramsJson;
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(rawKey.getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().encodeToString(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Cache key generation failed", e);
-        }
-    }
+    private static final Logger LOGGER = LoggerFactory.getLogger(CacheKeyGenerator.class);
 
     /**
-     * Determines which parameters to use for cache key generation.
-     * If no parameter is annotated with @CacheKey, all parameters are used.
-     * If at least one parameter is annotated with @CacheKey, only annotated parameters are used.
+     * Generates a cache key for the given method and arguments.
+     * If @CacheKey annotations are present, only annotated parameters are used.
+     * Otherwise, all parameters are included in the key.
+     * If no parameters are present, the key is based on the class name.
      *
-     * @param method the method for which to generate the key
+     * @param method the method being cached
      * @param args the method arguments
-     * @return the parameters to use for cache key generation
+     * @param target the target object (for checking implementation annotations)
+     * @return a unique cache key
      */
-    private static Object[] getKeyParameters(Method method, Object[] args) {
-        if (args == null || args.length == 0) {
-            return new Object[0];
-        }
+    public static String generate(Method method, Object[] args, Object target) {
+        List<Object> keyComponents = new ArrayList<>();
+        keyComponents.add(method.getDeclaringClass().getName());
 
         Parameter[] parameters = method.getParameters();
-        List<Object> keyParams = new ArrayList<>();
-        boolean hasCacheKeyAnnotation = false;
+        Method implMethod = null;
 
-        // Check if at least one parameter has the @CacheKey annotation
-        for (Parameter parameter : parameters) {
-            if (parameter.isAnnotationPresent(CacheKey.class)) {
-                hasCacheKeyAnnotation = true;
+        // Try to get the implementation method to check for @CacheKey annotations
+        if (target != null) {
+            try {
+                implMethod = target.getClass().getMethod(method.getName(), method.getParameterTypes());
+            } catch (NoSuchMethodException e) {
+                LOGGER.debug("Implementation method not found for {}", method.getName());
+            }
+        }
+
+        boolean hasAnnotatedParams = false;
+
+        // Check if any parameters have @CacheKey annotation (either on interface or implementation)
+        for (int i = 0; i < parameters.length; i++) {
+            if (hasParameterCacheKeyAnnotation(parameters[i], implMethod, i)) {
+                hasAnnotatedParams = true;
                 break;
             }
         }
 
-        // If no @CacheKey annotation is present, use all parameters
-        if (!hasCacheKeyAnnotation) {
-            return args;
-        }
-
-        // If at least one @CacheKey annotation is present, use only annotated parameters
-        for (int i = 0; i < parameters.length; i++) {
-            if (parameters[i].isAnnotationPresent(CacheKey.class)) {
-                keyParams.add(args[i]);
+        // If we have annotated parameters, only include those in the key
+        if (hasAnnotatedParams) {
+            for (int i = 0; i < parameters.length; i++) {
+                if (hasParameterCacheKeyAnnotation(parameters[i], implMethod, i)) {
+                    if (args != null && i < args.length) {
+                        keyComponents.add(args[i]);
+                    }
+                }
+            }
+        } else {
+            // Include all parameters
+            if (args != null) {
+                keyComponents.addAll(Arrays.asList(args));
             }
         }
 
-        return keyParams.toArray();
+        return generateHashKey(keyComponents);
+    }
+
+    /**
+     * Backwards compatibility method that doesn't check implementation annotations
+     */
+    public static String generate(Method method, Object[] args) {
+        return generate(method, args, null);
+    }
+
+    /**
+     * Checks if a parameter has a specific annotation, looking at both interface and implementation
+     */
+    private static boolean hasParameterCacheKeyAnnotation(Parameter interfaceParam, Method implMethod, int paramIndex) {
+        // Check interface parameter first
+        if (interfaceParam.isAnnotationPresent(CacheKey.class)) {
+            return true;
+        }
+
+        // Check implementation parameter if available
+        if (implMethod != null) {
+            Parameter[] implParams = implMethod.getParameters();
+            if (paramIndex < implParams.length) {
+                return implParams[paramIndex].isAnnotationPresent(CacheKey.class);
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Generates a hash-based key from the components
+     */
+    private static String generateHashKey(List<Object> components) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            StringBuilder sb = new StringBuilder();
+
+            for (Object component : components) {
+                if (component != null) {
+                    sb.append(component).append("|");
+                } else {
+                    sb.append("null|");
+                }
+            }
+
+            byte[] hash = md.digest(sb.toString().getBytes());
+            StringBuilder hexString = new StringBuilder();
+
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            LOGGER.warn("SHA-256 algorithm not available, falling back to simple hash", e);
+            return String.valueOf(components.hashCode());
+        }
     }
 }

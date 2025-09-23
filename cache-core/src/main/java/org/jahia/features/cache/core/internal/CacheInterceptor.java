@@ -18,12 +18,15 @@ package org.jahia.features.cache.core.internal;
 import org.jahia.features.cache.api.Cache;
 import org.jahia.features.cache.api.CacheConfig;
 import org.jahia.features.cache.api.CacheResult;
+import org.jahia.features.cache.api.CacheInvalidate;
+import org.jahia.features.cache.api.CacheInvalidateAll;
 import org.jahia.features.cache.api.CacheManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.annotation.Annotation;
 
 /**
  * @author Jerome Blanchard
@@ -43,8 +46,41 @@ public class CacheInterceptor implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         LOGGER.info("Invoking method: {}.{}", target.getClass().getName(), method.getName());
-        CacheResult ann = method.getAnnotation(CacheResult.class);
 
+        // Check for cache invalidation annotations first
+        CacheInvalidate invalidateAnn = getAnnotation(method, CacheInvalidate.class);
+        CacheInvalidateAll invalidateAllAnn = getAnnotation(method, CacheInvalidateAll.class);
+
+        // Handle cache invalidation
+        if (invalidateAnn != null) {
+            String cacheName = invalidateAnn.cacheName();
+            LOGGER.info("Method requires cache invalidation for cache: {}", cacheName);
+            try {
+                Cache<Object> cache = cacheManager.getCache(cacheName, Object.class);
+                String key = CacheKeyGenerator.generate(method, args);
+                cache.delete(key);
+                LOGGER.info("Cache entry with key: {} evicted from cache: {}", key, cacheName);
+            } catch (Exception e) {
+                LOGGER.warn("Failed to evict cache entry from cache: {}", cacheName, e);
+            }
+            return method.invoke(target, args);
+        }
+
+        if (invalidateAllAnn != null) {
+            String cacheName = invalidateAllAnn.cacheName();
+            LOGGER.info("Method requires cache invalidation of all entries for cache: {}", cacheName);
+            try {
+                Cache<Object> cache = cacheManager.getCache(cacheName, Object.class);
+                cache.clear();
+                LOGGER.info("All entries evicted from cache: {}", cacheName);
+            } catch (Exception e) {
+                LOGGER.warn("Failed to clear cache: {}", cacheName, e);
+            }
+            return method.invoke(target, args);
+        }
+
+        // Handle cache result
+        CacheResult ann = getAnnotation(method, CacheResult.class);
         if (ann != null) {
             String cacheName = ann.cacheName();
             LOGGER.info("Methods requires cached result from cache with name: {}", cacheName);
@@ -70,7 +106,19 @@ public class CacheInterceptor implements InvocationHandler {
             }
             return value;
         }
-
         return method.invoke(target, args);
+    }
+
+    private <T extends Annotation> T getAnnotation(Method method, Class<T> annotationClass) {
+        T ann = method.getAnnotation(annotationClass);
+        if (ann == null) {
+            try {
+                Method implMethod = target.getClass().getMethod(method.getName(), method.getParameterTypes());
+                ann = implMethod.getAnnotation(annotationClass);
+            } catch (NoSuchMethodException e) {
+                LOGGER.debug("Method {} not found in the implementation.", method.getName());
+            }
+        }
+        return ann;
     }
 }

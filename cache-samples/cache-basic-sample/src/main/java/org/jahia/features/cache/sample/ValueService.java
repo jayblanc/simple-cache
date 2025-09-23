@@ -15,20 +15,15 @@
  */
 package org.jahia.features.cache.sample;
 
-import org.jahia.features.cache.api.CacheInvalidate;
-import org.jahia.features.cache.api.CacheResult;
-
 /**
  * @author Jerome Blanchard
  */
-public interface BasicCacheSampleService {
+public interface ValueService {
 
-    String CACHE_NAME = "sample-basic-cache";
+    String getValue(String key);
 
-    @CacheResult(cacheName = CACHE_NAME)
-    String getValue();
+    void updateValue(String key, String value);
 
-    @CacheInvalidate(cacheName = CACHE_NAME)
-    void setValue(String value);
+    void clearAllValues();
 
 }

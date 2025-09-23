@@ -15,9 +15,16 @@
  */
 package org.jahia.features.cache.api;
 
-public class CacheNotFoundException extends Exception {
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-    public CacheNotFoundException(String message) {
-        super(message);
-    }
+/**
+ * @author Jerome Blanchard
+ */
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ ElementType.METHOD})
+public @interface CacheInvalidateAll {
+    String cacheName();
 }

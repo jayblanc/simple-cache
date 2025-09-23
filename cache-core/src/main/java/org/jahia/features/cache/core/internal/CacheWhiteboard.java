@@ -15,10 +15,13 @@
  */
 package org.jahia.features.cache.core.internal;
 
-import org.jahia.features.cache.api.CacheResult;
 import org.jahia.features.cache.api.CacheManager;
+import org.jahia.features.cache.api.CacheResult;
 import org.osgi.framework.*;
-import org.osgi.service.component.annotations.*;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Reference;
 import org.osgi.util.tracker.ServiceTracker;
 import org.osgi.util.tracker.ServiceTrackerCustomizer;
 import org.slf4j.Logger;
@@ -118,7 +121,7 @@ public class CacheWhiteboard {
     private boolean hasCacheAnnotations(Object svc) {
         for (Method m : svc.getClass().getMethods()) {
             if (m.isAnnotationPresent(CacheResult.class)) {
-                LOGGER.warn("Service {} has @CacheResult annotation on class methods but it needs to be placed on the interface class to allow proxy generation.", svc.getClass().getName());
+                return true;
             }
         }
         for (Class<?> iface : svc.getClass().getInterfaces()) {

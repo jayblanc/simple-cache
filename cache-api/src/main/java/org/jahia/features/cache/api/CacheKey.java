@@ -21,9 +21,13 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
+ * Annotation to mark method parameters that should be included in cache key generation.
+ * If no parameters are annotated with @CacheKey, all parameters are included in the key.
+ * If at least one parameter is annotated, only annotated parameters are included.
+ *
  * @author Jerome Blanchard
  */
+@Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ ElementType.PARAMETER})
 public @interface CacheKey {
 }

@@ -20,9 +20,6 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * Cache entry implementation suitable for all cache systems.
- * This class is serializable and tracks creation and access timestamps.
- *
  * @author Jerome Blanchard
  */
 public class CacheEntry<T> implements Serializable {
@@ -35,13 +32,6 @@ public class CacheEntry<T> implements Serializable {
     private final long created;
     private long accessed;
 
-    /**
-     * Creates a new cache entry with the given key and value.
-     * Sets creation and access timestamps to current time.
-     *
-     * @param key the cache key
-     * @param value the cached value
-     */
     public CacheEntry(String key, T value) {
         this.key = key;
         this.value = value;
@@ -49,46 +39,22 @@ public class CacheEntry<T> implements Serializable {
         this.accessed = this.created;
     }
 
-    /**
-     * Returns the cache key.
-     *
-     * @return the key
-     */
     public String key() {
         return key;
     }
 
-    /**
-     * Returns the cached value.
-     *
-     * @return the value
-     */
     public T value() {
         return value;
     }
 
-    /**
-     * Returns the creation timestamp.
-     *
-     * @return creation time in milliseconds
-     */
     public long created() {
         return created;
     }
 
-    /**
-     * Returns the last access timestamp.
-     *
-     * @return last access time in milliseconds
-     */
     public long accessed() {
         return accessed;
     }
 
-    /**
-     * Updates the access timestamp to the current time.
-     * This method should be called when the entry is accessed.
-     */
     @Transient
     public void touch() {
         accessed = System.currentTimeMillis();

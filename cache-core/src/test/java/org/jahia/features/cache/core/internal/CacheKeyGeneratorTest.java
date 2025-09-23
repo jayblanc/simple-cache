@@ -29,6 +29,10 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class CacheKeyGeneratorTest {
 
+    public void methodWithoutParameter1() {}
+
+    public void methodWithoutParameter2() {}
+
     public void methodWithoutAnnotation(String param1, String param2) {}
 
     public void methodWithPartialAnnotation(@CacheKey String param1, String param2) {}
@@ -36,6 +40,19 @@ public class CacheKeyGeneratorTest {
     public void methodWithAllAnnotated(@CacheKey String param1, @CacheKey String param2) {}
 
     public void methodWithMixedAnnotations(@CacheKey String param1, String param2, @CacheKey int param3, boolean param4) {}
+
+    @Test
+    public void testGenerateKeyWithoutParameter() throws Exception {
+        Method method1 = CacheKeyGeneratorTest.class.getMethod("methodWithoutParameter1");
+        Method method2 = CacheKeyGeneratorTest.class.getMethod("methodWithoutParameter2");
+        Object[] args = {};
+
+        String key1 = CacheKeyGenerator.generate(method1, args);
+        String key2 = CacheKeyGenerator.generate(method2, args);
+
+        // Keys must be identical for different methods without parameters
+        assertEquals(key1, key2);
+    }
 
     @Test
     public void testGenerateKeyWithoutAnnotations() throws Exception {

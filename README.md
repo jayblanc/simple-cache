@@ -98,37 +98,34 @@ feature:install cache
 
 ### 2. Annotation-Based Caching (Recommended)
 
-The simplest way to cache method's result is using annotations. Just annotate your interface methods in your OSGi components:
+The simplest way to cache method's result is using annotations. Just annotate your methods in your OSGi components:
 
 ```java
 public interface BasicCacheSampleService {
-    String CACHE_NAME = "sample-basic-cache";
-
-    @CacheResult(cacheName = CACHE_NAME)
+    
     String getValue();
 
-    @CacheInvalidate(cacheName = CACHE_NAME)
-    void setValue(String value);
-
+    void invalidateValue();
 }
 
 @Component(service = BasicCacheSampleService.class, immediate = true)
 public class BasicCacheSampleServiceImpl implements BasicCacheSampleService {
-    private String value = "default";
-
+    private static final String CACHE_NAME = "sample-basic-cache";
+    
     @Override
+    @CacheResult(cacheName = CACHE_NAME)
     public String getValue() {
-        return "Value at " + System.currentTimeMillis() + " is: " + value;
+        return "Result value computed at " + System.currentTimeMillis();
     }
 
     @Override
-    public void setValue(String value) {
-        this.value = value;
+    @CacheInvalidate(cacheName = CACHE_NAME)
+    public void invalidateValue() {
     }
 }
 ```
 
-**That's it!** The cache automatically discovers your annotated interface when your OSGi component is activated and replaces the service with a cached proxy.
+**That's it!** The cache automatically discovers your annotated methods when your OSGi component is activated and replaces the service with a cached proxy.
 
 ### 3. Programmatic Cache Usage
 
@@ -196,11 +193,11 @@ For fine-grained control over cache key generation, use the `@CacheKey` annotati
 
 ```java
 public interface UserService {
-    @CacheResult(cacheName = "userCache")
-    User getUser(@CacheKey String userId, String extraParam);
+    @CacheResult(cacheName = "users")
+    User getUser(@CacheKey String userId);
     
-    @CacheResult(cacheName = "userCache") 
-    User getUserByEmail(@CacheKey String email, boolean includeInactive);
+    @CacheInvalidate(cacheName = "users")
+    void updateUser(@CacheKey String userId, String userInfos);
 }
 ```
 
@@ -315,7 +312,7 @@ Cache<String> cache = cacheManager.create("myCache", config, String.class);
 The framework automatically detects the environment:
 
 - **In-Memory Cache**: Used by default, perfect for single-instance applications
-- **Clustered Cache**: Automatically enabled when Infinispan features are available, ideal for distributed systems
+- **Clustered Cache**: Automatically enabled when Infinispan or Hazelcast features are available, ideal for distributed systems
 
 ## Architecture Details
 
@@ -334,23 +331,9 @@ The framework automatically detects the environment:
 - Automatic cleanup when services are unregistered
 - Graceful handling of cache misses and errors
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
 Licensed under the Apache License 2.0. See [LICENSE](LICENSE) file for details.
-
-## Support
-
-- **Issues**: Report bugs and feature requests via GitHub Issues
-- **Documentation**: Check the `cache-samples` module for working examples
-- **Community**: Join our developer community for discussions
 
 ---
 
